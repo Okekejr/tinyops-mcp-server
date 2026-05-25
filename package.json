@@ -8,7 +8,7 @@
   "homepage": "https://tinyops.cc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Okekejr/tinyops-mcp-server.git"
+    "url": "git+https://github.com/Okekejr/tinyops-mcp-server.git"
   },
   "keywords": [
     "mcp",
@@ -22,7 +22,7 @@
     "node": ">=18.0.0"
   },
   "bin": {
-    "tinyops-mcp": "./dist/index.js"
+    "tinyops-mcp": "dist/index.js"
   },
   "files": [
     "dist"

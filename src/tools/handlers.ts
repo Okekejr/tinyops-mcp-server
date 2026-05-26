@@ -31,9 +31,66 @@ function requireSlug(value: unknown, paramName: string): string {
   return str;
 }
 
+const MAX_PAGE = 999;
+
+// Coerces and validates a page parameter. Accepts integer-valued numbers or
+// numeric strings in the range [1, MAX_PAGE]. Throws on anything else so a
+// buggy or hostile client cannot drive the API with page=999999.
+export function validatePage(value: unknown): number {
+  const n = coerceInteger(value, 'page');
+  if (n < 1 || n > MAX_PAGE) {
+    throw new McpToolError(
+      'VALIDATION_FAILED',
+      `page must be an integer between 1 and ${MAX_PAGE}. Got: ${n}`,
+      400,
+      { paramName: 'page', min: 1, max: MAX_PAGE },
+    );
+  }
+  return n;
+}
+
+// Coerces and validates a pageSize parameter against a per-endpoint max.
+export function validatePageSize(value: unknown, maxAllowed: number): number {
+  const n = coerceInteger(value, 'pageSize');
+  if (n < 1 || n > maxAllowed) {
+    throw new McpToolError(
+      'VALIDATION_FAILED',
+      `pageSize must be an integer between 1 and ${maxAllowed}. Got: ${n}`,
+      400,
+      { paramName: 'pageSize', min: 1, max: maxAllowed },
+    );
+  }
+  return n;
+}
+
+function coerceInteger(value: unknown, paramName: string): number {
+  let n: number;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    n = Number(value);
+  } else {
+    throw new McpToolError(
+      'VALIDATION_FAILED',
+      `${paramName} must be a number. Got: ${typeof value === 'string' ? `'${value}'` : typeof value}`,
+      400,
+      { paramName, expectedType: 'integer' },
+    );
+  }
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    throw new McpToolError(
+      'VALIDATION_FAILED',
+      `${paramName} must be a finite integer. Got: ${value as never}`,
+      400,
+      { paramName, expectedType: 'integer' },
+    );
+  }
+  return n;
+}
+
 export const listRules: ToolHandler = async (args, client) => {
   const params = new URLSearchParams();
-  if (args.page) params.set('page', String(args.page));
+  if (args.page !== undefined) params.set('page', String(validatePage(args.page)));
   if (args.mode) params.set('mode', String(args.mode));
   if (args.triggerType) params.set('triggerType', String(args.triggerType));
   const rules = await client.get(`/api/mcp/rules?${params}`);
@@ -50,8 +107,8 @@ export const listExecutions: ToolHandler = async (args, client) => {
   const params = new URLSearchParams();
   if (args.ruleId) params.set('ruleId', requireUUID(args.ruleId, 'ruleId'));
   if (args.status) params.set('status', String(args.status));
-  if (args.page) params.set('page', String(args.page));
-  if (args.pageSize) params.set('pageSize', String(args.pageSize));
+  if (args.page !== undefined) params.set('page', String(validatePage(args.page)));
+  if (args.pageSize !== undefined) params.set('pageSize', String(validatePageSize(args.pageSize, 50)));
   return formatResult(await client.get(`/api/mcp/executions?${params}`));
 };
 

@@ -5,6 +5,14 @@ export interface McpError {
   retryAfterSeconds?: number;
 }
 
+export interface RequestOptions {
+  // Per-call timeout override. When omitted, the client's default timeout
+  // applies. Use this for operations that legitimately run longer than the
+  // default (e.g., test_rule, deactivate_pack) so the global default can stay
+  // tight for everything else.
+  timeoutMs?: number;
+}
+
 export class TinyOpsClient {
   private readonly timeoutMs: number;
 
@@ -16,8 +24,9 @@ export class TinyOpsClient {
     this.timeoutMs = opts?.timeoutMs ?? 30_000;
   }
 
-  async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async request<T>(method: string, path: string, body?: unknown, options?: RequestOptions): Promise<T> {
     const url = `${this.baseUrl}${path}`;
+    const effectiveTimeout = options?.timeoutMs ?? this.timeoutMs;
     let res: Response;
     try {
       res = await fetch(url, {
@@ -28,11 +37,11 @@ export class TinyOpsClient {
           'X-MCP-Client': 'tinyops-mcp-server/0.1.0',
         },
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(effectiveTimeout),
       });
     } catch (err) {
       if (err instanceof Error && err.name === 'TimeoutError') {
-        throw new McpToolError('TIMEOUT', `Request to ${method} ${path} timed out after ${this.timeoutMs}ms`, 408, { timeoutMs: this.timeoutMs, retryable: true });
+        throw new McpToolError('TIMEOUT', `Request to ${method} ${path} timed out after ${effectiveTimeout}ms`, 408, { timeoutMs: effectiveTimeout, retryable: true });
       }
       throw new McpToolError('NETWORK_ERROR', err instanceof Error ? err.message : 'Network request failed', 0, { retryable: true });
     }
@@ -46,10 +55,10 @@ export class TinyOpsClient {
     return res.json() as T;
   }
 
-  get = <T>(path: string) => this.request<T>('GET', path);
-  post = <T>(path: string, body?: unknown) => this.request<T>('POST', path, body);
-  patch = <T>(path: string, body?: unknown) => this.request<T>('PATCH', path, body);
-  del = <T>(path: string) => this.request<T>('DELETE', path);
+  get = <T>(path: string, options?: RequestOptions) => this.request<T>('GET', path, undefined, options);
+  post = <T>(path: string, body?: unknown, options?: RequestOptions) => this.request<T>('POST', path, body, options);
+  patch = <T>(path: string, body?: unknown, options?: RequestOptions) => this.request<T>('PATCH', path, body, options);
+  del = <T>(path: string, options?: RequestOptions) => this.request<T>('DELETE', path, undefined, options);
 }
 
 export class McpToolError extends Error {

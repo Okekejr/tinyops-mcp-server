@@ -1,70 +1,54 @@
-import { McpToolError, type TinyOpsClient } from '../client.js';
+import type { TinyOpsClient } from '../client.js';
 import type { ToolHandler } from '../util.js';
 import { formatResult } from '../util.js';
+import type {
+  ListRulesArgs,
+  GetRuleArgs,
+  ListExecutionsArgs,
+  GetExecutionArgs,
+  GetUsageArgs,
+  CreateRuleArgs,
+  UpdateRuleArgs,
+  PromoteRuleArgs,
+  ValidateRuleYamlArgs,
+  TestRuleArgs,
+  SetRuleModeArgs,
+  DeleteRuleArgs,
+  DeactivatePackArgs,
+} from './schemas.js';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$/;
-
-function requireUUID(value: unknown, paramName: string): string {
-  const str = String(value ?? '');
-  if (!UUID_RE.test(str)) {
-    throw new McpToolError(
-      'VALIDATION_FAILED',
-      `${paramName} must be a valid UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). Got: '${str.slice(0, 50)}'`,
-      400,
-      { paramName, expectedFormat: 'UUID v4', suggestedNextTool: paramName === 'executionId' ? 'list_executions' : 'list_rules' },
-    );
-  }
-  return str;
-}
-
-function requireSlug(value: unknown, paramName: string): string {
-  const str = String(value ?? '');
-  if (!SLUG_RE.test(str)) {
-    throw new McpToolError(
-      'VALIDATION_FAILED',
-      `${paramName} must be a valid slug (lowercase alphanumeric + hyphens, 2-50 chars). Got: '${str.slice(0, 50)}'`,
-      400,
-      { paramName, expectedFormat: 'slug' },
-    );
-  }
-  return str;
-}
-
-export const listRules: ToolHandler = async (args, client) => {
+export const listRules: ToolHandler<ListRulesArgs> = async (args, client) => {
   const params = new URLSearchParams();
-  if (args.page) params.set('page', String(args.page));
-  if (args.mode) params.set('mode', String(args.mode));
-  if (args.triggerType) params.set('triggerType', String(args.triggerType));
+  if (args.page !== undefined) params.set('page', String(args.page));
+  if (args.mode) params.set('mode', args.mode);
+  if (args.triggerType) params.set('triggerType', args.triggerType);
   const rules = await client.get(`/api/mcp/rules?${params}`);
   return formatResult(rules);
 };
 
-export const getRule: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
-  const rule = await client.get(`/api/mcp/rules/${ruleId}`);
+export const getRule: ToolHandler<GetRuleArgs> = async (args, client) => {
+  const rule = await client.get(`/api/mcp/rules/${args.ruleId}`);
   return formatResult(rule);
 };
 
-export const listExecutions: ToolHandler = async (args, client) => {
+export const listExecutions: ToolHandler<ListExecutionsArgs> = async (args, client) => {
   const params = new URLSearchParams();
-  if (args.ruleId) params.set('ruleId', requireUUID(args.ruleId, 'ruleId'));
-  if (args.status) params.set('status', String(args.status));
-  if (args.page) params.set('page', String(args.page));
-  if (args.pageSize) params.set('pageSize', String(args.pageSize));
+  if (args.ruleId) params.set('ruleId', args.ruleId);
+  if (args.status) params.set('status', args.status);
+  if (args.page !== undefined) params.set('page', String(args.page));
+  if (args.pageSize !== undefined) params.set('pageSize', String(args.pageSize));
   return formatResult(await client.get(`/api/mcp/executions?${params}`));
 };
 
-export const getExecution: ToolHandler = async (args, client) => {
-  const executionId = requireUUID(args.executionId, 'executionId');
-  return formatResult(await client.get(`/api/mcp/executions/${executionId}`));
+export const getExecution: ToolHandler<GetExecutionArgs> = async (args, client) => {
+  return formatResult(await client.get(`/api/mcp/executions/${args.executionId}`));
 };
 
-export const getUsage: ToolHandler = async (_args, client) => {
+export const getUsage: ToolHandler<GetUsageArgs> = async (_args, client) => {
   return formatResult(await client.get('/api/mcp/usage'));
 };
 
-export const createRule: ToolHandler = async (args, client) => {
+export const createRule: ToolHandler<CreateRuleArgs> = async (args, client) => {
   const result = await client.post('/api/mcp/rules', { yaml: args.yaml });
   return formatResult({
     ...result as object,
@@ -72,30 +56,26 @@ export const createRule: ToolHandler = async (args, client) => {
   });
 };
 
-export const updateRule: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
-  const result = await client.post(`/api/mcp/rules/${ruleId}/update`, { yaml: args.yaml });
+export const updateRule: ToolHandler<UpdateRuleArgs> = async (args, client) => {
+  const result = await client.post(`/api/mcp/rules/${args.ruleId}/update`, { yaml: args.yaml });
   return formatResult(result);
 };
 
-export const promoteRule: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
-  const result = await client.post(`/api/mcp/rules/${ruleId}/promote`);
+export const promoteRule: ToolHandler<PromoteRuleArgs> = async (args, client) => {
+  const result = await client.post(`/api/mcp/rules/${args.ruleId}/promote`);
   return formatResult(result);
 };
 
-export const validateRuleYaml: ToolHandler = async (args, client) => {
+export const validateRuleYaml: ToolHandler<ValidateRuleYamlArgs> = async (args, client) => {
   return formatResult(await client.post('/api/mcp/rules/validate', { yaml: args.yaml }));
 };
 
-export const testRule: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
-  return formatResult(await client.post(`/api/mcp/rules/${ruleId}/test`));
+export const testRule: ToolHandler<TestRuleArgs> = async (args, client) => {
+  return formatResult(await client.post(`/api/mcp/rules/${args.ruleId}/test`));
 };
 
-export const setRuleMode: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
-  const result = await client.post(`/api/mcp/rules/${ruleId}/mode`, { mode: args.mode });
+export const setRuleMode: ToolHandler<SetRuleModeArgs> = async (args, client) => {
+  const result = await client.post(`/api/mcp/rules/${args.ruleId}/mode`, { mode: args.mode });
   return formatResult(result);
 };
 
@@ -109,9 +89,8 @@ interface DeactivatePackResponse {
   };
 }
 
-export const deactivatePack: ToolHandler = async (args, client) => {
-  const packId = requireSlug(args.packId, 'packId');
-  const result = await client.post<DeactivatePackResponse>(`/api/packs/${packId}/deactivate`);
+export const deactivatePack: ToolHandler<DeactivatePackArgs> = async (args, client) => {
+  const result = await client.post<DeactivatePackResponse>(`/api/packs/${args.packId}/deactivate`);
 
   const deactivation = result.deactivation;
   if (deactivation && deactivation.failed > 0) {
@@ -130,10 +109,9 @@ export const deactivatePack: ToolHandler = async (args, client) => {
   });
 };
 
-export const deleteRule: ToolHandler = async (args, client) => {
-  const ruleId = requireUUID(args.ruleId, 'ruleId');
+export const deleteRule: ToolHandler<DeleteRuleArgs> = async (args, client) => {
   if (!args.confirmationToken) {
-    const token = await client.post<{ token: string; expiresInSeconds: number; rule: unknown }>('/api/mcp/rules/delete-confirm', { ruleId });
+    const token = await client.post<{ token: string; expiresInSeconds: number; rule: unknown }>('/api/mcp/rules/delete-confirm', { ruleId: args.ruleId });
     return formatResult({
       status: 'confirmation_required',
       confirmationToken: token.token,
@@ -142,6 +120,6 @@ export const deleteRule: ToolHandler = async (args, client) => {
       message: `Confirm deletion by calling delete_rule again with this confirmationToken. Expires in ${token.expiresInSeconds}s.`,
     });
   }
-  const result = await client.post('/api/mcp/rules/delete', { ruleId, confirmationToken: args.confirmationToken });
+  const result = await client.post('/api/mcp/rules/delete', { ruleId: args.ruleId, confirmationToken: args.confirmationToken });
   return formatResult(result);
 };

@@ -88,9 +88,13 @@ export const validateRuleYaml: ToolHandler = async (args, client) => {
   return formatResult(await client.post('/api/mcp/rules/validate', { yaml: args.yaml }));
 };
 
+// test_rule evaluates conditions against live provider data, which can
+// legitimately take longer than the default 30s when an upstream API is slow.
+const LONG_RUNNING_TIMEOUT_MS = 60_000;
+
 export const testRule: ToolHandler = async (args, client) => {
   const ruleId = requireUUID(args.ruleId, 'ruleId');
-  return formatResult(await client.post(`/api/mcp/rules/${ruleId}/test`));
+  return formatResult(await client.post(`/api/mcp/rules/${ruleId}/test`, undefined, { timeoutMs: LONG_RUNNING_TIMEOUT_MS }));
 };
 
 export const setRuleMode: ToolHandler = async (args, client) => {
@@ -111,7 +115,9 @@ interface DeactivatePackResponse {
 
 export const deactivatePack: ToolHandler = async (args, client) => {
   const packId = requireSlug(args.packId, 'packId');
-  const result = await client.post<DeactivatePackResponse>(`/api/packs/${packId}/deactivate`);
+  // Pack deactivation removes every rule in the pack synchronously and can
+  // exceed the default timeout on larger packs.
+  const result = await client.post<DeactivatePackResponse>(`/api/packs/${packId}/deactivate`, undefined, { timeoutMs: LONG_RUNNING_TIMEOUT_MS });
 
   const deactivation = result.deactivation;
   if (deactivation && deactivation.failed > 0) {

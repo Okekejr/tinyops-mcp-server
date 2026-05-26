@@ -4,6 +4,7 @@ import type { TinyOpsClient } from '../client.js';
 import { McpToolError } from '../client.js';
 import type { ToolHandler } from '../util.js';
 import * as handlers from './handlers.js';
+import { TOOL_SCHEMAS, formatZodIssues, type ToolName } from './schemas.js';
 
 const TOOL_DEFINITIONS = [
   {
@@ -12,7 +13,7 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        page: { type: 'number', description: 'Page number (default: 1)' },
+        page: { type: 'integer', minimum: 1, maximum: 999, description: 'Page number, 1-999 (default: 1)' },
         mode: { type: 'string', enum: ['live', 'shadow', 'disabled'], description: 'Filter by rule mode' },
         triggerType: { type: 'string', enum: ['schedule', 'webhook', 'poll'], description: 'Filter by trigger type' },
       },
@@ -35,8 +36,8 @@ const TOOL_DEFINITIONS = [
       properties: {
         ruleId: { type: 'string', description: 'Filter by rule UUID (e.g., a1b2c3d4-e5f6-7890-abcd-ef1234567890). Use list_rules to find valid IDs.' },
         status: { type: 'string', enum: ['success', 'failure', 'skipped', 'timeout', 'running'], description: 'Filter by status' },
-        page: { type: 'number', description: 'Page number (default: 1)' },
-        pageSize: { type: 'number', description: 'Results per page (default: 20, max: 50)' },
+        page: { type: 'integer', minimum: 1, maximum: 999, description: 'Page number, 1-999 (default: 1)' },
+        pageSize: { type: 'integer', minimum: 1, maximum: 50, description: 'Results per page, 1-50 (default: 20)' },
       },
     },
   },
@@ -139,20 +140,23 @@ const TOOL_DEFINITIONS = [
   },
 ];
 
-const toolHandlers = new Map<string, ToolHandler>([
-  ['list_rules', handlers.listRules],
-  ['get_rule', handlers.getRule],
-  ['list_executions', handlers.listExecutions],
-  ['get_execution', handlers.getExecution],
-  ['get_usage', handlers.getUsage],
-  ['create_rule', handlers.createRule],
-  ['update_rule', handlers.updateRule],
-  ['promote_rule', handlers.promoteRule],
-  ['set_rule_mode', handlers.setRuleMode],
-  ['validate_rule_yaml', handlers.validateRuleYaml],
-  ['test_rule', handlers.testRule],
-  ['delete_rule', handlers.deleteRule],
-  ['deactivate_pack', handlers.deactivatePack],
+// Handlers are typed against their specific arg shape via tools/schemas.ts.
+// The dispatcher narrows the validated args before invocation, so we can keep
+// the registry as ToolHandler<unknown> here without losing safety upstream.
+const toolHandlers = new Map<ToolName, ToolHandler<never>>([
+  ['list_rules', handlers.listRules as ToolHandler<never>],
+  ['get_rule', handlers.getRule as ToolHandler<never>],
+  ['list_executions', handlers.listExecutions as ToolHandler<never>],
+  ['get_execution', handlers.getExecution as ToolHandler<never>],
+  ['get_usage', handlers.getUsage as ToolHandler<never>],
+  ['create_rule', handlers.createRule as ToolHandler<never>],
+  ['update_rule', handlers.updateRule as ToolHandler<never>],
+  ['promote_rule', handlers.promoteRule as ToolHandler<never>],
+  ['set_rule_mode', handlers.setRuleMode as ToolHandler<never>],
+  ['validate_rule_yaml', handlers.validateRuleYaml as ToolHandler<never>],
+  ['test_rule', handlers.testRule as ToolHandler<never>],
+  ['delete_rule', handlers.deleteRule as ToolHandler<never>],
+  ['deactivate_pack', handlers.deactivatePack as ToolHandler<never>],
 ]);
 
 export function registerTools(server: Server, client: TinyOpsClient) {
@@ -162,12 +166,25 @@ export function registerTools(server: Server, client: TinyOpsClient) {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    const handler = toolHandlers.get(name);
-    if (!handler) {
+    const handler = toolHandlers.get(name as ToolName);
+    const schema = TOOL_SCHEMAS[name as ToolName];
+    if (!handler || !schema) {
       return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
     }
+
+    const parsed = schema.safeParse(args ?? {});
+    if (!parsed.success) {
+      const err = new McpToolError(
+        'VALIDATION_FAILED',
+        `Invalid arguments for ${name}: ${formatZodIssues(parsed.error)}`,
+        400,
+        { toolName: name, issues: parsed.error.issues },
+      );
+      return err.toMcpContent();
+    }
+
     try {
-      return await handler(args ?? {}, client);
+      return await handler(parsed.data as never, client);
     } catch (err) {
       if (err instanceof McpToolError) return err.toMcpContent();
       return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'INTERNAL_ERROR', message: String(err) }) }] };

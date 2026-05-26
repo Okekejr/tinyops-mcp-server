@@ -12,7 +12,7 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        page: { type: 'number', description: 'Page number (default: 1)' },
+        page: { type: 'integer', minimum: 1, maximum: 999, description: 'Page number, 1-999 (default: 1)' },
         mode: { type: 'string', enum: ['live', 'shadow', 'disabled'], description: 'Filter by rule mode' },
         triggerType: { type: 'string', enum: ['schedule', 'webhook', 'poll'], description: 'Filter by trigger type' },
       },
@@ -35,8 +35,8 @@ const TOOL_DEFINITIONS = [
       properties: {
         ruleId: { type: 'string', description: 'Filter by rule UUID (e.g., a1b2c3d4-e5f6-7890-abcd-ef1234567890). Use list_rules to find valid IDs.' },
         status: { type: 'string', enum: ['success', 'failure', 'skipped', 'timeout', 'running'], description: 'Filter by status' },
-        page: { type: 'number', description: 'Page number (default: 1)' },
-        pageSize: { type: 'number', description: 'Results per page (default: 20, max: 50)' },
+        page: { type: 'integer', minimum: 1, maximum: 999, description: 'Page number, 1-999 (default: 1)' },
+        pageSize: { type: 'integer', minimum: 1, maximum: 50, description: 'Results per page, 1-50 (default: 20)' },
       },
     },
   },

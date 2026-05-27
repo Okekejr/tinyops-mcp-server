@@ -85,7 +85,7 @@ export class McpToolError extends Error {
       case 'RATE_LIMITED': return `Try again in ${this.details?.retryAfterSeconds ?? 60} seconds.`;
       case 'SCOPE_INSUFFICIENT': return 'This action requires a higher-scoped API key (write or admin).';
       case 'VALIDATION_FAILED': return 'Check the parameter format. Use list_rules or list_executions to find valid IDs.';
-      case 'TIMEOUT': return 'The API server took too long to respond. Try again — if the issue persists, the operation may be processing in the background.';
+      case 'TIMEOUT': return 'The API server took too long to respond. Try again. If the issue persists, the operation may be processing in the background.';
       case 'NETWORK_ERROR': return 'Could not reach the TinyOps API. Check that the server is running and accessible.';
       default: return 'Check the TinyOps dashboard for more details.';
     }

@@ -149,7 +149,7 @@ action:
   method: send_message
   params:
     channel: "#code-review"
-    message: "A PR was opened — review the description and files"`,
+    message: "A PR was opened. Review the description and files."`,
     },
     {
       name: 'Daily Execution Summary',

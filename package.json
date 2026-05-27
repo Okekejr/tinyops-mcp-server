@@ -1,7 +1,7 @@
 {
   "name": "tinyops-mcp-server",
-  "version": "0.1.0",
-  "description": "Model Context Protocol server for TinyOps — manage developer-workflow automation rules from any MCP-compatible AI client.",
+  "version": "0.1.1",
+  "description": "Model Context Protocol server for TinyOps. Manage developer-workflow automation rules from any MCP-compatible AI client.",
   "type": "module",
   "license": "MIT",
   "author": "Emmanuel Okeke",
@@ -22,6 +22,7 @@
     "node": ">=18.0.0"
   },
   "bin": {
+    "tinyops-mcp-server": "dist/index.js",
     "tinyops-mcp": "dist/index.js"
   },
   "files": [

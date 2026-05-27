@@ -79,7 +79,7 @@ export function getRuleTemplates() {
   return [
     {
       name: 'Stale PR Alert',
-      description: 'Notify Slack when a PR has been open for 3+ days',
+      description: 'Notify Slack when a PR has been open for 3+ days with title and link',
       yaml: `name: Stale PR Alert
 trigger:
   type: poll
@@ -90,11 +90,11 @@ condition:
   operator: gt
   value: 3
 action:
-  provider: slack-notifications
+  provider: slack
   method: send_message
   params:
     channel: "#engineering"
-    message: "PR has been open for over 3 days"`,
+    message: "⚠️ PR #{{condition.pr.number}} \\"{{condition.pr.title}}\\" has been open for {{condition.result}} days. {{condition.pr.url}}"`,
     },
     {
       name: 'Deploy Safety Check',
@@ -115,22 +115,22 @@ schedule_guard:
     },
     {
       name: 'Large PR Warning',
-      description: 'Comment on PRs with more than 500 lines changed',
+      description: 'Alert Slack when a PR exceeds 500 lines changed',
       yaml: `name: Large PR Warning
 trigger:
-  type: webhook
-  event: pull_request.opened
-  source: github
+  type: poll
+  interval: 15m
 condition:
   provider: github
   check: pr.lines_changed
   operator: gt
   value: 500
 action:
-  provider: github
-  method: create_comment
+  provider: slack
+  method: send_message
   params:
-    body: "This PR has over 500 lines changed. Consider splitting into smaller PRs."`,
+    channel: "#engineering"
+    message: "⚠️ PR #{{condition.pr.number}} \\"{{condition.pr.title}}\\" has {{condition.result}} lines changed. Consider splitting into smaller PRs. {{condition.pr.url}}"`,
     },
     {
       name: 'Missing Description Check',
@@ -145,7 +145,7 @@ condition:
   check: pr.files
   operator: is_not_empty
 action:
-  provider: slack-notifications
+  provider: slack
   method: send_message
   params:
     channel: "#code-review"
@@ -185,7 +185,7 @@ condition:
   operator: eq
   value: "error"
 action:
-  provider: slack-notifications
+  provider: slack
   method: send_message
   params:
     channel: "#deploys"
